@@ -48,7 +48,7 @@ msbuild /p:ArtifactoryPublish=true
 ## Understanding the Script
 
 ### Setting the Build Name, Build Number and Output Path  
-The following snippet from the scproj file does the following:
+The following snippet from the csproj file does the following:
 1. Creates a variable named *BuildFlags* with the following value *--build-name=$(BuildName) --build-number=$(BuildNumber)"*.
 The default values for the $(BuildName) and $(BuildNumber) are the project name and the current time respectively.
 the build name and number can be set as arguments when running the msbuild command. For example:
@@ -80,7 +80,7 @@ msbuild /p:ArtifactoryPublish=true /p:BuildName=someBuildName /p:BuildNumber=10
 ```
 
 ### Downloading Dependencies:
-The following snippet downlaods the *MsbuildLibrary.dll* file from the *msbuild-local* Artifactory repository
+The following snippet downloads the *MsbuildLibrary.dll* file from the *msbuild-local* Artifactory repository
 into the dependencies directory.
 ```
 <Target Name="DownloadDependencies" BeforeTargets="PrepareForBuild">
@@ -142,4 +142,36 @@ The following snippet publishes the build-info to Artifactory.
 You can read more about the JFrog CLI commands used in the above script [here](https://www.jfrog.com/confluence/display/CLI/CLI+for+JFrog+Artifactory).
 
 ## Managing Nuget Packages
-We are currently working on enhancing this solution, so that it also supports resolution, deployment and build-info collection for nuget package. We will update this example when nuget support is released.
+Up until now, we saw how we can configure our project to resolve and deploy generic files from and to Artifactory and also generate build-info accordingly. Let's see how we can do the same when our project consumes nuget packages as dependencies and/or produces nuget packages. The build-info we'll generate will include all of the project's nuget dependencies, including transitive dependencies, as well as the generated artifacts. Follow these steps to achieve this.
+
+### Create NuGet Repositories in Artifactory
+From the Artifactory UI, create the following repositories. You can read more about Nuget repositories in the [Nuget Repositories User Guide](https://www.jfrog.com/confluence/display/RTF/NuGet+Repositories)<br>
+* Local NuGet repository named *nuget-local*. 
+* Remote NuGet repository named *nuget-remote*.
+* Virtual NuGet repository named *nuget-virtual*. 
+Next, include *nuget-remote* and *nuget-local* in *nuget-virtual*.
+
+### Build the Solution Using JFrog CLI
+CD into the solution's root directory and run the following command 
+```console
+> jfrog rt nuget restore nuget-virtual --build-name=nuget-build --build-number=1
+```
+The command restored the two project's dependencies by downloading them from Artifactory and also stored the build-info locally.
+
+CD into the MsbuildExample directory and run the following command to create the nuget artifact.
+```
+> nuget pack
+```
+
+Upload the created nuget package to Artifactory by running:
+```
+> jfrog rt u MsbuildExample.1.0.0.nupkg nuget-local --build-name=nuget-build --build-number=1
+```
+
+Lastly, publish the build-info to Artifactory.
+```
+> jfrog rt bp nuget-build 1
+```
+As we saw earlier, the above commands can also be embedded in your project's csproj file or be executed by your build script.
+<br><br>
+For more information about [Artifactory as a Nuget repository](https://jfrog.com/integration/nuget-repository/) using JFrog CLI read [Building Nuget Packages with JFrog CLI](https://www.jfrog.com/confluence/display/CLI/CLI+for+JFrog+Artifactory#CLIforJFrogArtifactory-BuildingNugetPackages)
